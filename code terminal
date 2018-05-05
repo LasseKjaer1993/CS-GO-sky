@@ -1,0 +1,105 @@
+using System;
+using System.Collections.Generic;
+using System.Configuration;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Net;
+
+using Amazon;
+using Amazon.EC2;
+using Amazon.EC2.Util;
+using Amazon.EC2.Model;
+using Amazon.SimpleDB;
+using Amazon.SimpleDB.Model;
+using Amazon.S3;
+using Amazon.S3.Model;
+
+namespace skycsgoconsole
+{
+    class Program
+    {
+         
+        public static void Main(string[] args)
+        {
+            var ec2Client = new AmazonEC2Client();
+            string instanceId = start_csgo_server(ec2Client);
+            //Console.Write(GetServiceOutput());
+            Console.Read();
+            Server_info(ec2Client, instanceId);
+            TerminateInstance(ec2Client, instanceId);
+        }
+
+        //opretter en instanse 
+        private static string start_csgo_server(AmazonEC2Client ec2Client)
+        {
+            string amiID = "ami-7fa68794";
+            string keyPairName = "csgoFF";
+
+            List<string> groups = new List<string>();
+            groups.Add("sg-49501a24");
+            var launchRequest = new RunInstancesRequest()
+            {
+                ImageId = amiID,
+                InstanceType = InstanceType.M4Large,
+                MinCount = 1,
+                MaxCount = 1,
+                KeyName = keyPairName,
+                SecurityGroupIds = groups
+            };
+            var launchResponse = ec2Client.RunInstances(launchRequest);
+
+            var instances = launchResponse.Reservation.Instances;
+            string instanceId = "";
+            foreach (Instance item in instances)
+            {
+               
+                instanceId = item.InstanceId;
+                Console.WriteLine();
+                Console.WriteLine("New instance: " + item.InstanceId);
+                Console.WriteLine("Instance state: " + item.State.Name);
+                Console.WriteLine("instance blev launched" + item.State.Name);
+               
+            }
+            return instanceId;
+            
+         
+        }
+
+        public static void Server_info(AmazonEC2Client eC2Client, string instanceId)
+        {
+            //skal display info omkring serverne
+
+        }
+
+        public static void TerminateInstance( AmazonEC2Client ec2Client, string instanceId)
+        {
+            //terminate instance 
+            var request = new TerminateInstancesRequest();
+            request.InstanceIds = new List<string>() { instanceId };
+
+            try
+            {
+                var response = ec2Client.TerminateInstances(request);
+                foreach (InstanceStateChange item in response.TerminatingInstances)
+                {
+                    Console.WriteLine("Terminated instance: " + item.InstanceId);
+                    Console.WriteLine("Instance state: " + item.CurrentState.Name);
+                }
+            }
+            catch (AmazonEC2Exception ex)
+            {
+                // Check the ErrorCode to see if the instance does not exist.
+                if ("InvalidInstanceID.NotFound" == ex.ErrorCode)
+                {
+                    Console.WriteLine("Instance {0} does not exist.", instanceId);
+                }
+                else
+                {
+                    // The exception was thrown for another reason, so re-throw the exception.
+                    throw;
+                }
+            }
+        }
+    }
+}
